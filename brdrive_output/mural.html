@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mural de Dashboards — BR DRIVE</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; background: #0e0808; color: #fff; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* TOP BAR */
+    .mural-bar { background: #1a0a0a; border-bottom: 1px solid rgba(192,57,43,0.4); height: 52px; display: flex; align-items: center; gap: 8px; padding: 0 12px; flex-shrink: 0; overflow-x: auto; }
+    .mural-logo { background: #C0392B; color: #fff; font-weight: 900; font-size: 12px; padding: 5px 8px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
+    .mural-title { color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 1px; white-space: nowrap; flex-shrink: 0; }
+    .mural-sep { width: 1px; height: 30px; background: rgba(192,57,43,0.35); flex-shrink: 0; }
+    .bar-group { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .bar-label { color: rgba(255,255,255,0.45); font-size: 8px; letter-spacing: 1px; white-space: nowrap; }
+    .btn-layout { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.7); border-radius: 5px; padding: 4px 9px; font-size: 10px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .btn-layout:hover { background: rgba(192,57,43,0.25); border-color: rgba(192,57,43,0.5); color: #fff; }
+    .btn-layout.active { background: rgba(192,57,43,0.35); border-color: #C0392B; color: #fff; }
+    .btn-shortcut { background: rgba(26,82,118,0.3); border: 1px solid rgba(41,128,185,0.35); color: #5dade2; border-radius: 5px; padding: 4px 8px; font-size: 10px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .btn-shortcut:hover { background: rgba(41,128,185,0.3); border-color: #2980b9; color: #fff; }
+    .btn-config { background: rgba(142,68,173,0.25); border: 1px solid rgba(142,68,173,0.4); color: #af7ac5; border-radius: 5px; padding: 4px 9px; font-size: 10px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .btn-config:hover { background: rgba(142,68,173,0.4); color: #fff; }
+    .mural-clock { color: #fff; font-size: 14px; font-weight: 700; letter-spacing: 2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .btn-fullscreen { background: rgba(39,174,96,0.25); border: 1px solid rgba(39,174,96,0.4); color: #58d68d; border-radius: 5px; padding: 4px 9px; font-size: 10px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .btn-fullscreen:hover { background: rgba(39,174,96,0.4); color: #fff; }
+    .btn-home { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15); color: rgba(255,255,255,0.6); border-radius: 5px; padding: 4px 8px; font-size: 10px; text-decoration: none; display: flex; align-items: center; transition: all 0.15s; white-space: nowrap; }
+    .btn-home:hover { background: rgba(192,57,43,0.2); color: #fff; }
+    .bar-spacer { flex: 1; min-width: 8px; }
+
+    /* GRID */
+    .mural-grid { flex: 1; display: grid; gap: 4px; padding: 4px; overflow: hidden; }
+    .layout-2x2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    .layout-1x4 { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr 1fr 1fr; }
+    .layout-2x1 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+    .layout-1x2 { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    .layout-1x1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+
+    /* PANEL — --pz é o fator de zoom do iframe */
+    .mural-panel {
+      --pz: 0.62;
+      background: #1a0a0a;
+      border: 1px solid rgba(192,57,43,0.25);
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-bar { height: 26px; background: rgba(0,0,0,0.35); border-bottom: 1px solid rgba(192,57,43,0.2); display: flex; align-items: center; padding: 0 8px; gap: 6px; flex-shrink: 0; z-index: 2; }
+    .panel-num { width: 16px; height: 16px; background: #C0392B; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; color: #fff; flex-shrink: 0; }
+    .panel-title { color: rgba(255,255,255,0.8); font-size: 9px; font-weight: 600; flex: 1; }
+    .panel-btn { background: none; border: none; color: rgba(255,255,255,0.35); cursor: pointer; font-size: 12px; padding: 2px 3px; border-radius: 3px; transition: all 0.15s; line-height: 1; }
+    .panel-btn:hover { background: rgba(192,57,43,0.25); color: #fff; }
+
+    /* Wrapper + iframe com scale para caber no painel */
+    .panel-frame-wrap { flex: 1; position: relative; overflow: hidden; }
+    .panel-iframe {
+      position: absolute;
+      top: 0; left: 0;
+      width:  calc(100% / var(--pz));
+      height: calc(100% / var(--pz));
+      border: none;
+      background: #0e0808;
+      transform: scale(var(--pz));
+      transform-origin: top left;
+    }
+
+    /* MAXIMIZE OVERLAY */
+    .panel-max-overlay { display: none; position: fixed; inset: 0; z-index: 500; background: #0e0808; flex-direction: column; }
+    .panel-max-overlay.open { display: flex; }
+    .panel-max-bar { height: 38px; background: #1a0a0a; border-bottom: 1px solid rgba(192,57,43,0.3); display: flex; align-items: center; padding: 0 14px; gap: 10px; flex-shrink: 0; }
+    .panel-max-title { color: #fff; font-size: 12px; font-weight: 700; flex: 1; }
+    .panel-max-close { background: rgba(192,57,43,0.3); border: 1px solid rgba(192,57,43,0.5); color: #fff; border-radius: 5px; padding: 4px 12px; font-size: 11px; cursor: pointer; }
+    .panel-max-close:hover { background: #C0392B; }
+    .panel-max-iframe { flex: 1; border: none; width: 100%; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: #1a0a0a; border: 1px solid rgba(192,57,43,0.45); border-radius: 10px; padding: 20px; width: 520px; max-width: 95vw; }
+    .modal-title { color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 1px; margin-bottom: 14px; border-bottom: 1px solid rgba(192,57,43,0.3); padding-bottom: 10px; }
+    .modal-row { margin-bottom: 10px; }
+    .modal-row label { color: #ddd; font-size: 9px; letter-spacing: 1px; display: block; margin-bottom: 4px; }
+    .modal-row select { width: 100%; background: #0e0808; border: 1px solid rgba(192,57,43,0.3); color: #fff; border-radius: 4px; padding: 6px 8px; font-size: 11px; }
+    .modal-row select:focus { outline: none; border-color: #C0392B; }
+    .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .modal-ok { background: #C0392B; color: #fff; border: none; border-radius: 5px; padding: 7px 18px; font-size: 11px; font-weight: 700; cursor: pointer; }
+    .modal-ok:hover { background: #a93226; }
+    .modal-cancel { background: rgba(255,255,255,0.08); color: #ddd; border: 1px solid rgba(255,255,255,0.15); border-radius: 5px; padding: 7px 18px; font-size: 11px; cursor: pointer; }
+    .modal-cancel:hover { background: rgba(255,255,255,0.15); }
+  </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="mural-bar">
+  <div class="mural-logo">J&amp;T</div>
+  <span class="mural-title">BR DRIVE &mdash; MURAL DE DASHBOARDS</span>
+  <div class="mural-sep"></div>
+
+  <div class="bar-group">
+    <span class="bar-label">LAYOUT</span>
+    <button class="btn-layout active" onclick="setLayout('2x2')" id="btn-2x2">&#9638; 2&times;2</button>
+    <button class="btn-layout" onclick="setLayout('1x4')" id="btn-1x4">&#8801; 1&times;4</button>
+    <button class="btn-layout" onclick="setLayout('2x1')" id="btn-2x1">&#9636; 2&times;1</button>
+    <button class="btn-layout" onclick="setLayout('1x1')" id="btn-1x1">&#9635; 1&times;1</button>
+  </div>
+
+  <div class="mural-sep"></div>
+
+  <div class="bar-group">
+    <span class="bar-label">ATALHOS</span>
+    <button class="btn-shortcut" onclick="setPanel(0,'dashboard.html','Utiliza&#231;&#227;o APP')">&#128202; Utiliza&#231;&#227;o</button>
+    <button class="btn-shortcut" onclick="setPanel(1,'pont_op.html','Pontualidade Op.')">&#8987; Pontualidade</button>
+    <button class="btn-shortcut" onclick="setPanel(2,'app_mensal.html','APP Mensal')">&#128197; APP Mensal</button>
+    <button class="btn-shortcut" onclick="setPanel(3,'pont_mensal.html','Pont. Mensal')">&#128198; Pont. Mensal</button>
+  </div>
+
+  <div class="mural-sep"></div>
+
+  <button class="btn-config" onclick="openConfig()">&#9881; Configurar Pain&#233;is</button>
+
+  <div class="bar-spacer"></div>
+
+  <span class="mural-clock" id="mural-clock">00:00:00</span>
+
+  <div class="mural-sep"></div>
+
+  <button class="btn-fullscreen" onclick="toggleFullscreen()" id="btn-full">&#9974; Tela Cheia</button>
+  <a href="home.html" class="btn-home">&#127968; Home</a>
+</div>
+
+<!-- MURAL GRID -->
+<div class="mural-grid layout-2x2" id="mural-grid">
+  <div class="mural-panel" id="panel-0">
+    <div class="panel-bar">
+      <div class="panel-num">1</div>
+      <span class="panel-title" id="ptitle-0">Utiliza&#231;&#227;o APP</span>
+      <button class="panel-btn" onclick="maximizePanel(0)" title="Maximizar">&#10548;</button>
+      <button class="panel-btn" onclick="reloadPanel(0)" title="Recarregar">&#8635;</button>
+    </div>
+    <div class="panel-frame-wrap">
+      <iframe class="panel-iframe" id="iframe-0" src="dashboard.html"></iframe>
+    </div>
+  </div>
+  <div class="mural-panel" id="panel-1">
+    <div class="panel-bar">
+      <div class="panel-num">2</div>
+      <span class="panel-title" id="ptitle-1">Pontualidade Op.</span>
+      <button class="panel-btn" onclick="maximizePanel(1)" title="Maximizar">&#10548;</button>
+      <button class="panel-btn" onclick="reloadPanel(1)" title="Recarregar">&#8635;</button>
+    </div>
+    <div class="panel-frame-wrap">
+      <iframe class="panel-iframe" id="iframe-1" src="pont_op.html"></iframe>
+    </div>
+  </div>
+  <div class="mural-panel" id="panel-2">
+    <div class="panel-bar">
+      <div class="panel-num">3</div>
+      <span class="panel-title" id="ptitle-2">APP Mensal</span>
+      <button class="panel-btn" onclick="maximizePanel(2)" title="Maximizar">&#10548;</button>
+      <button class="panel-btn" onclick="reloadPanel(2)" title="Recarregar">&#8635;</button>
+    </div>
+    <div class="panel-frame-wrap">
+      <iframe class="panel-iframe" id="iframe-2" src="app_mensal.html"></iframe>
+    </div>
+  </div>
+  <div class="mural-panel" id="panel-3">
+    <div class="panel-bar">
+      <div class="panel-num">4</div>
+      <span class="panel-title" id="ptitle-3">Pont. Mensal</span>
+      <button class="panel-btn" onclick="maximizePanel(3)" title="Maximizar">&#10548;</button>
+      <button class="panel-btn" onclick="reloadPanel(3)" title="Recarregar">&#8635;</button>
+    </div>
+    <div class="panel-frame-wrap">
+      <iframe class="panel-iframe" id="iframe-3" src="pont_mensal.html"></iframe>
+    </div>
+  </div>
+</div>
+
+<!-- MAXIMIZE OVERLAY -->
+<div class="panel-max-overlay" id="max-overlay">
+  <div class="panel-max-bar">
+    <span class="panel-max-title" id="max-title">&mdash;</span>
+    <button class="panel-max-close" onclick="closeMaximize()">&#10005; Fechar</button>
+  </div>
+  <iframe class="panel-max-iframe" id="max-iframe" src="about:blank"></iframe>
+</div>
+
+<!-- CONFIG MODAL -->
+<div class="modal-overlay" id="config-modal" onclick="if(event.target===this)closeConfig()">
+  <div class="modal-box">
+    <div class="modal-title">&#9881; Configurar Pain&#233;is / 配置面板</div>
+    <div class="modal-row">
+      <label>PAINEL 1</label>
+      <select id="cfg-0">
+        <option value="dashboard.html" selected>&#128202; Utiliza&#231;&#227;o APP</option>
+        <option value="pont_op.html">&#8987; Pontualidade Op.</option>
+        <option value="evol_semanal.html">&#128200; App Semanal</option>
+        <option value="app_mensal.html">&#128197; APP Mensal</option>
+        <option value="infracoes.html">&#128680; Infra&#231;&#245;es</option>
+        <option value="motoristas.html">&#128100; Motoristas APP</option>
+        <option value="pont_semanal.html">&#128202; Pont. Semanal</option>
+        <option value="pont_mensal.html">&#128198; Pont. Mensal</option>
+        <option value="inf_pontualidade.html">&#128308; Inf. Pontualidade</option>
+        <option value="pont_motoristas.html">&#128663; Pont. Motoristas</option>
+      </select>
+    </div>
+    <div class="modal-row">
+      <label>PAINEL 2</label>
+      <select id="cfg-1">
+        <option value="dashboard.html">&#128202; Utiliza&#231;&#227;o APP</option>
+        <option value="pont_op.html" selected>&#8987; Pontualidade Op.</option>
+        <option value="evol_semanal.html">&#128200; App Semanal</option>
+        <option value="app_mensal.html">&#128197; APP Mensal</option>
+        <option value="infracoes.html">&#128680; Infra&#231;&#245;es</option>
+        <option value="motoristas.html">&#128100; Motoristas APP</option>
+        <option value="pont_semanal.html">&#128202; Pont. Semanal</option>
+        <option value="pont_mensal.html">&#128198; Pont. Mensal</option>
+        <option value="inf_pontualidade.html">&#128308; Inf. Pontualidade</option>
+        <option value="pont_motoristas.html">&#128663; Pont. Motoristas</option>
+      </select>
+    </div>
+    <div class="modal-row">
+      <label>PAINEL 3</label>
+      <select id="cfg-2">
+        <option value="dashboard.html">&#128202; Utiliza&#231;&#227;o APP</option>
+        <option value="pont_op.html">&#8987; Pontualidade Op.</option>
+        <option value="evol_semanal.html">&#128200; App Semanal</option>
+        <option value="app_mensal.html" selected>&#128197; APP Mensal</option>
+        <option value="infracoes.html">&#128680; Infra&#231;&#245;es</option>
+        <option value="motoristas.html">&#128100; Motoristas APP</option>
+        <option value="pont_semanal.html">&#128202; Pont. Semanal</option>
+        <option value="pont_mensal.html">&#128198; Pont. Mensal</option>
+        <option value="inf_pontualidade.html">&#128308; Inf. Pontualidade</option>
+        <option value="pont_motoristas.html">&#128663; Pont. Motoristas</option>
+      </select>
+    </div>
+    <div class="modal-row">
+      <label>PAINEL 4</label>
+      <select id="cfg-3">
+        <option value="dashboard.html">&#128202; Utiliza&#231;&#227;o APP</option>
+        <option value="pont_op.html">&#8987; Pontualidade Op.</option>
+        <option value="evol_semanal.html">&#128200; App Semanal</option>
+        <option value="app_mensal.html">&#128197; APP Mensal</option>
+        <option value="infracoes.html">&#128680; Infra&#231;&#245;es</option>
+        <option value="motoristas.html">&#128100; Motoristas APP</option>
+        <option value="pont_semanal.html">&#128202; Pont. Semanal</option>
+        <option value="pont_mensal.html" selected>&#128198; Pont. Mensal</option>
+        <option value="inf_pontualidade.html">&#128308; Inf. Pontualidade</option>
+        <option value="pont_motoristas.html">&#128663; Pont. Motoristas</option>
+      </select>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeConfig()">Cancelar</button>
+      <button class="modal-ok" onclick="applyConfig()">&#10003; Aplicar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Clock
+function tick(){
+  const d=new Date();
+  document.getElementById('mural-clock').textContent=
+    String(d.getHours()).padStart(2,'0')+':'+
+    String(d.getMinutes()).padStart(2,'0')+':'+
+    String(d.getSeconds()).padStart(2,'0');
+}
+tick(); setInterval(tick,1000);
+
+// Zoom por layout — ajusta a escala do iframe para caber no painel sem barra de rolagem
+const ZOOM_MAP={'2x2':0.62,'1x4':0.82,'2x1':0.65,'1x1':0.95};
+const ALL_LAYOUTS=['2x2','1x4','2x1','1x1'];
+const LAYOUT_CSS={'2x2':'layout-2x2','1x4':'layout-1x4','2x1':'layout-2x1','1x1':'layout-1x1'};
+
+function setPanelZoom(z){
+  document.querySelectorAll('.mural-panel').forEach(p=>{
+    p.style.setProperty('--pz', z);
+  });
+}
+
+function setLayout(name){
+  const grid=document.getElementById('mural-grid');
+  ALL_LAYOUTS.forEach(l=>{
+    grid.classList.remove(LAYOUT_CSS[l]);
+    const btn=document.getElementById('btn-'+l);
+    if(btn) btn.classList.remove('active');
+  });
+  grid.classList.add(LAYOUT_CSS[name]);
+  const active=document.getElementById('btn-'+name);
+  if(active) active.classList.add('active');
+  setPanelZoom(ZOOM_MAP[name]||0.62);
+}
+
+// Injeta CSS no iframe para esconder a sidebar (mesmo origem)
+function injectStyles(idx){
+  try{
+    const iframe=document.getElementById('iframe-'+idx);
+    if(!iframe) return;
+    const doc=iframe.contentDocument||iframe.contentWindow.document;
+    if(!doc||!doc.head) return;
+    let st=doc.getElementById('__mi__');
+    if(!st){st=doc.createElement('style');st.id='__mi__';doc.head.appendChild(st);}
+    st.textContent=
+      '.sidebar{display:none!important;}'+
+      '.main{margin-left:0!important;width:100%!important;}'+
+      'body{overflow:hidden!important;}';
+  }catch(e){}
+}
+
+function bindIframe(idx){
+  const iframe=document.getElementById('iframe-'+idx);
+  if(!iframe) return;
+  iframe.addEventListener('load',function(){injectStyles(idx);});
+}
+[0,1,2,3].forEach(bindIframe);
+
+// Panel control
+const PAGE_NAMES={
+  'dashboard.html':'Utilização APP','pont_op.html':'Pontualidade Op.',
+  'evol_semanal.html':'App Semanal','app_mensal.html':'APP Mensal',
+  'infracoes.html':'Infrações','motoristas.html':'Motoristas APP',
+  'pont_semanal.html':'Pont. Semanal','pont_mensal.html':'Pont. Mensal',
+  'inf_pontualidade.html':'Inf. Pontualidade','pont_motoristas.html':'Pont. Motoristas',
+  'home.html':'Home'
+};
+function setPanel(idx,url,title){
+  const iframe=document.getElementById('iframe-'+idx);
+  const ptitle=document.getElementById('ptitle-'+idx);
+  if(iframe) iframe.src=url;
+  if(ptitle) ptitle.textContent=title||PAGE_NAMES[url]||url;
+}
+function reloadPanel(idx){
+  const iframe=document.getElementById('iframe-'+idx);
+  if(iframe){const s=iframe.src;iframe.src='about:blank';setTimeout(()=>iframe.src=s,50);}
+}
+function maximizePanel(idx){
+  const iframe=document.getElementById('iframe-'+idx);
+  const title=document.getElementById('ptitle-'+idx);
+  const overlay=document.getElementById('max-overlay');
+  if(iframe&&overlay){
+    document.getElementById('max-iframe').src=iframe.src;
+    document.getElementById('max-title').textContent=(title?title.textContent:'Painel '+(idx+1))+' — Maximizado';
+    overlay.classList.add('open');
+  }
+}
+function closeMaximize(){
+  document.getElementById('max-overlay').classList.remove('open');
+  document.getElementById('max-iframe').src='about:blank';
+}
+
+// Fullscreen
+function toggleFullscreen(){
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  }else{
+    document.exitFullscreen().catch(()=>{});
+  }
+}
+document.addEventListener('fullscreenchange',()=>{
+  const btn=document.getElementById('btn-full');
+  if(btn) btn.innerHTML=document.fullscreenElement?'&#9974; Sair Tela Cheia':'&#9974; Tela Cheia';
+});
+
+// Config Modal
+function openConfig(){
+  for(let i=0;i<4;i++){
+    const iframe=document.getElementById('iframe-'+i);
+    const sel=document.getElementById('cfg-'+i);
+    if(iframe&&sel){
+      try{const fname=new URL(iframe.src).pathname.split('/').pop();sel.value=fname||iframe.src;}catch(e){}
+    }
+  }
+  document.getElementById('config-modal').classList.add('open');
+}
+function closeConfig(){
+  document.getElementById('config-modal').classList.remove('open');
+}
+function applyConfig(){
+  for(let i=0;i<4;i++){
+    const sel=document.getElementById('cfg-'+i);
+    if(sel&&sel.value) setPanel(i,sel.value,PAGE_NAMES[sel.value]||sel.value);
+  }
+  closeConfig();
+}
+</script>
+</body>
+</html>

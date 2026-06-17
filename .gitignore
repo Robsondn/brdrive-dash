@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.zip
+analise_julho.py
+fixar_ip.bat
+*.xlsx
+*.db
