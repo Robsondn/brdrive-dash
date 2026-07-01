@@ -47,7 +47,7 @@ body { font-family: Arial, sans-serif; background: #0e0808; color: #fff; display
 .table-header { padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; }
 .table-header span { color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
 .table-header small { color: rgba(255,255,255,0.9); font-size: 9px; }
-.table-scroll { overflow-y: auto; max-height: calc(100vh - 340px); }
+.table-scroll { overflow-y: auto; max-height: max(calc(100vh - 340px), 260px); }
 table { width: 100%; border-collapse: collapse; }
 thead { position: sticky; top: 0; z-index: 2; }
 th { padding: 8px 10px; font-size: 9px; letter-spacing: 1px; font-weight: 700; }
@@ -155,7 +155,7 @@ tfoot tr { position: sticky; bottom: 0; z-index: 2; }
               <span>RANKING UTILIZAÇÃO SAÍDA / 出发使用率排名</span>
               <small>ordenado por volume / 按量排序</small>
             </div>
-            <div style="padding:14px 16px;overflow-y:auto;max-height:calc(100vh - 340px);" id="barras-trans"></div>
+            <div style="padding:14px 16px;overflow-y:auto;max-height:max(calc(100vh - 340px),260px);" id="barras-trans"></div>
             <div class="legend-bar" style="padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);">
               <div class="legend-item"><div class="legend-dot" style="background:#27ae60;"></div>≥85% OK / 达标</div>
               <div class="legend-item"><div class="legend-dot" style="background:#e67e22;"></div>70–84% 注意</div>
