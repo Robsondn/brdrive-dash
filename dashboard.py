@@ -3676,6 +3676,12 @@ def gerar_dashboard(pasta="brdrive_output", dados=None):
             f.write(html)
         print(f"  🔨 {pid}.html (aguarda dados)")
 
+    # index.html — redireciona automaticamente para home.html (necessário para brdrive-dash.onrender.com/)
+    with open(f"{pasta}/index.html", "w", encoding="utf-8") as f:
+        f.write('<!doctype html><meta charset="utf-8">'
+                '<meta http-equiv="refresh" content="0;url=home.html">'
+                '<script>location.replace("home.html")</script>')
+
     print(f"\n🎉 Dashboard gerado em: {pasta}/")
     print(f"🌐 Abrindo no navegador...")
     webbrowser.open("file://" + os.path.abspath(f"{pasta}/home.html"))
