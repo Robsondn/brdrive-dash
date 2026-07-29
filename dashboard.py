@@ -207,7 +207,7 @@ body { font-family: Arial, sans-serif; background: #0e0808; color: #fff; display
 .table-header { padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; }
 .table-header span { color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
 .table-header small { color: rgba(255,255,255,0.9); font-size: 9px; }
-.table-scroll { overflow-y: auto; max-height: calc(100vh - 340px); }
+.table-scroll { overflow-y: auto; max-height: max(calc(100vh - 340px), 260px); }
 table { width: 100%; border-collapse: collapse; }
 thead { position: sticky; top: 0; z-index: 2; }
 th { padding: 8px 10px; font-size: 9px; letter-spacing: 1px; font-weight: 700; }
@@ -455,7 +455,7 @@ def pg_utilizacao_app(df):
               <span>RANKING UTILIZAÇÃO SAÍDA / 出发使用率排名</span>
               <small>ordenado por volume / 按量排序</small>
             </div>
-            <div style="padding:14px 16px;overflow-y:auto;max-height:calc(100vh - 340px);" id="barras-trans"></div>
+            <div style="padding:14px 16px;overflow-y:auto;max-height:max(calc(100vh - 340px),260px);" id="barras-trans"></div>
             <div class="legend-bar" style="padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);">
               <div class="legend-item"><div class="legend-dot" style="background:#27ae60;"></div>≥85% OK / 达标</div>
               <div class="legend-item"><div class="legend-dot" style="background:#e67e22;"></div>70–84% 注意</div>
@@ -749,7 +749,7 @@ def pg_pontualidade_op(df):
               <span>RANKING PONTUALIDADE SAÍDA / 出发准时率排名</span>
               <small>ordenado por volume / 按量排序</small>
             </div>
-            <div style="padding:14px 16px;overflow-y:auto;max-height:calc(100vh - 340px);" id="barras-pont"></div>
+            <div style="padding:14px 16px;overflow-y:auto;max-height:max(calc(100vh - 340px),260px);" id="barras-pont"></div>
             <div class="legend-bar" style="padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);">
               <div class="legend-item"><div class="legend-dot" style="background:#27ae60;"></div>≥85% OK / 达标</div>
               <div class="legend-item"><div class="legend-dot" style="background:#e67e22;"></div>70–84% 注意</div>
@@ -2148,7 +2148,7 @@ def pg_pont_motoristas(df):
               <span>KPI PONT. SAÍDA / 出发准时</span>
               <small>% no prazo · melhor primeiro</small>
             </div>
-            <div class="table-scroll" style="max-height:calc(100vh - 360px);">
+            <div class="table-scroll" style="max-height:max(calc(100vh - 360px),260px);">
               <table>
                 <thead><tr style="background:#0d2a3a;border-bottom:2px solid rgba(26,82,118,0.5);">
                   <th style="text-align:center;color:#5dade2;width:24px;">#</th>
@@ -2169,7 +2169,7 @@ def pg_pont_motoristas(df):
               <span>KPI PONT. CHEGADA / 到达准时</span>
               <small>% no prazo · melhor primeiro</small>
             </div>
-            <div class="table-scroll" style="max-height:calc(100vh - 360px);">
+            <div class="table-scroll" style="max-height:max(calc(100vh - 360px),260px);">
               <table>
                 <thead><tr style="background:#0d2a3a;border-bottom:2px solid rgba(26,82,118,0.5);">
                   <th style="text-align:center;color:#5dade2;width:24px;">#</th>
@@ -2190,7 +2190,7 @@ def pg_pont_motoristas(df):
               <span>KPI GERAL / 综合准时</span>
               <small>média saída + chegada · melhor primeiro</small>
             </div>
-            <div class="table-scroll" style="max-height:calc(100vh - 360px);">
+            <div class="table-scroll" style="max-height:max(calc(100vh - 360px),260px);">
               <table>
                 <thead><tr style="background:#3b1f4a;border-bottom:2px solid rgba(142,68,173,0.5);">
                   <th style="text-align:center;color:#c39bd3;width:24px;">#</th>
@@ -2990,7 +2990,7 @@ def pg_motoristas(df):
               <span>KPI SAÍDA / 出发指标</span>
               <small>% ON por motorista · melhor primeiro</small>
             </div>
-            <div class="table-scroll" style="max-height:calc(100vh - 360px);">
+            <div class="table-scroll" style="max-height:max(calc(100vh - 360px),260px);">
               <table>
                 <thead><tr style="background:#0d2a3a;border-bottom:2px solid rgba(26,82,118,0.5);">
                   <th style="text-align:center;color:#5dade2;width:24px;">#</th>
@@ -3011,7 +3011,7 @@ def pg_motoristas(df):
               <span>KPI CHEGADA / 到达指标</span>
               <small>% ON por motorista · melhor primeiro</small>
             </div>
-            <div class="table-scroll" style="max-height:calc(100vh - 360px);">
+            <div class="table-scroll" style="max-height:max(calc(100vh - 360px),260px);">
               <table>
                 <thead><tr style="background:#0d2a3a;border-bottom:2px solid rgba(26,82,118,0.5);">
                   <th style="text-align:center;color:#5dade2;width:24px;">#</th>
@@ -3032,7 +3032,7 @@ def pg_motoristas(df):
               <span>KPI GERAL / 综合指标</span>
               <small>média saída + chegada · melhor primeiro</small>
             </div>
-            <div class="table-scroll" style="max-height:calc(100vh - 360px);">
+            <div class="table-scroll" style="max-height:max(calc(100vh - 360px),260px);">
               <table>
                 <thead><tr style="background:#0d3320;border-bottom:2px solid rgba(30,132,73,0.5);">
                   <th style="text-align:center;color:#2ecc71;width:24px;">#</th>

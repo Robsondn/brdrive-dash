@@ -28,7 +28,11 @@ echo.
 echo  [2/3] Publicando no Render (GitHub)...
 echo.
 
-git add brdrive_output/
+git add brdrive_output/ dashboard.py
+git diff --cached --quiet && (
+    echo  Sem alteracoes para publicar. Render ja esta atualizado.
+    goto fim
+)
 git commit -m "Atualizar dashboard %date% %time%"
 git push origin main
 
@@ -38,11 +42,14 @@ if %ERRORLEVEL% NEQ 0 (
     echo.
 ) else (
     echo.
-    echo  [3/3] Publicado! Link fixo:
+    echo  [3/3] Publicado! Links:
     echo.
     echo     https://brdrive-dash.onrender.com/home.html
+    echo     https://robsondn.github.io/brdrive-dash/home.html
     echo.
 )
+
+:fim
 
 echo  Pressione qualquer tecla para fechar...
 pause >nul
