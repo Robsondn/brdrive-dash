@@ -116,6 +116,7 @@ def navbar(pagina_ativa):
         ("mural",          "📺", "Mural",              "仪表板墙"),
         ("dashboard",      "📊", "Utilização App",      "应用使用情况"),
         ("pont_op",        "⏱",  "Pontualidade Op.",    "运营准时率"),
+        ("pont_bases",     "🏢", "Pont. por Base/DC",   "基地/DC准时率"),
         ("evol_semanal",   "📈", "App Semanal",         "应用周度绩效"),
         ("app_mensal",     "📅", "App Mensal",          "APP月度绩效"),
         ("infracoes",      "🚨", "Infrações",           "违章管理"),
@@ -2879,6 +2880,352 @@ def pg_pont_mensal(df):
     return pagina_html(nav, conteudo + js, "Pontualidade Mensal")
 
 
+def pg_pont_bases(df):
+    """Pontualidade por DC/Base: SP BRE e cada DC entram como um 'hub' (igual
+    ao Resumo DC da planilha), com as bases de cada um embaixo, expansível ao
+    clicar. Mesma regra DC<->Base da planilha: o lado que começa com 'DC ' é
+    o DC da viagem; o outro lado é a base dele. Quando nenhum dos dois lados
+    é DC, SP BRE assume o papel de DC. O que sobra (sem DC e sem SP BRE) cai
+    num grupo à parte."""
+    df2 = df.copy()
+    if "ORIGEM" not in df2.columns:
+        df2["ORIGEM"] = "SP BRE"
+    if "Chegada" not in df2.columns:
+        df2["Chegada"] = "SP BRE"
+    df2["ORIGEM"] = df2["ORIGEM"].fillna("").astype(str)
+    df2["Chegada"] = df2["Chegada"].fillna("").astype(str)
+
+    origem, chegada = df2["ORIGEM"], df2["Chegada"]
+    mask_o_dc = origem.str.startswith("DC ")
+    mask_c_dc = chegada.str.startswith("DC ") & ~mask_o_dc
+    sem_dc = ~mask_o_dc & ~mask_c_dc
+    mask_o_bre = sem_dc & (origem == "SP BRE")
+    mask_c_bre = sem_dc & ~mask_o_bre & (chegada == "SP BRE")
+    sem_dc_e_bre = sem_dc & ~mask_o_bre & ~mask_c_bre
+
+    dc = pd.Series("", index=df2.index, dtype=object)
+    base = pd.Series("", index=df2.index, dtype=object)
+    sent = pd.Series("direto", index=df2.index, dtype=object)
+
+    dc[mask_o_dc], base[mask_o_dc], sent[mask_o_dc] = origem[mask_o_dc], chegada[mask_o_dc], "ida"
+    dc[mask_c_dc], base[mask_c_dc], sent[mask_c_dc] = chegada[mask_c_dc], origem[mask_c_dc], "volta"
+    dc[mask_o_bre], base[mask_o_bre], sent[mask_o_bre] = origem[mask_o_bre], chegada[mask_o_bre], "ida"
+    dc[mask_c_bre], base[mask_c_bre], sent[mask_c_bre] = chegada[mask_c_bre], origem[mask_c_bre], "volta"
+    dc[sem_dc_e_bre] = "OUTRAS ROTAS (sem DC/BRE)"
+    base[sem_dc_e_bre] = origem[sem_dc_e_bre] + " → " + chegada[sem_dc_e_bre]
+
+    df2["dc_"] = dc
+    df2["base_"] = base
+    df2["sent_"] = sent
+    df2["grp_"] = np.where(df2["TIPO DE OPERAÇÃO"] == "Secundaria", "Entrega", "Coleta")
+
+    cols = ["DATA", "grp_", "dc_", "base_", "sent_", "PONTUALIDADE SAÍDA", "PONTUALIDADE CHEGADA"]
+    df_js = df2[cols].copy()
+    df_js["DATA"] = df_js["DATA"].dt.strftime("%Y-%m-%d")
+    df_js = df_js.fillna("")
+    df_js.columns = ["d", "grp", "dc", "base", "st", "ps", "pc"]
+    data_json = df_js.to_json(orient="records", force_ascii=False)
+
+    dcs = sorted(df2["dc_"].dropna().unique().tolist())
+    date_min = df2["DATA"].min().strftime("%Y-%m-%d") if not df2.empty else ""
+    date_max = df2["DATA"].max().strftime("%Y-%m-%d") if not df2.empty else ""
+
+    opts_dc = '<option value="Todos">Todos</option>' + "".join(
+        f'<option value="{d}">{d}</option>' for d in dcs)
+
+    sel_style = 'width:100%;background:#0e0808;border:1px solid rgba(26,82,118,0.4);color:#fff;border-radius:4px;padding:5px 6px;font-size:11px;'
+    inp_style = 'width:100%;background:#0e0808;border:1px solid rgba(26,82,118,0.4);color:#fff;border-radius:4px;padding:5px 6px;font-size:11px;color-scheme:dark;'
+
+    filtro_html = f"""
+    <div style="width:210px;flex-shrink:0;">
+      <div style="background:#1a1010;border-radius:8px;padding:14px;border:1px solid rgba(26,82,118,0.3);position:sticky;top:16px;">
+        <div style="color:#2980b9;font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid rgba(26,82,118,0.3);">FILTROS / 筛选</div>
+        <div style="margin-bottom:10px;">
+          <div style="color:#ddd;font-size:9px;letter-spacing:1px;margin-bottom:4px;">日期 | Data De</div>
+          <input type="date" id="f-date-from" value="{date_min}" onchange="setFiltro('dateFrom',this.value)" style="{inp_style}margin-bottom:4px;">
+          <div style="color:#ddd;font-size:9px;letter-spacing:1px;margin-bottom:4px;margin-top:6px;">日期 | Data Até</div>
+          <input type="date" id="f-date-to" value="{date_max}" onchange="setFiltro('dateTo',this.value)" style="{inp_style}">
+        </div>
+        <div style="margin-bottom:10px;display:flex;gap:4px;">
+          <button onclick="setPeriodo('dia')" class="btn-periodo" id="bp-dia" style="flex:1;background:rgba(26,82,118,0.2);border:1px solid rgba(26,82,118,0.4);color:#5dade2;border-radius:4px;padding:5px 2px;font-size:9px;font-weight:700;cursor:pointer;">DIA</button>
+          <button onclick="setPeriodo('semana')" class="btn-periodo" id="bp-semana" style="flex:1;background:rgba(26,82,118,0.2);border:1px solid rgba(26,82,118,0.4);color:#5dade2;border-radius:4px;padding:5px 2px;font-size:9px;font-weight:700;cursor:pointer;">SEMANA</button>
+          <button onclick="setPeriodo('mes')" class="btn-periodo" id="bp-mes" style="flex:1;background:rgba(26,82,118,0.2);border:1px solid rgba(26,82,118,0.4);color:#5dade2;border-radius:4px;padding:5px 2px;font-size:9px;font-weight:700;cursor:pointer;">MÊS</button>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div style="color:#ddd;font-size:9px;letter-spacing:1px;margin-bottom:4px;">类型 | Tipo</div>
+          <select id="f-grp" onchange="setFiltro('grp',this.value)" style="{sel_style}">
+            <option value="Todos">Todos</option>
+            <option value="Entrega">Entrega / 派件</option>
+            <option value="Coleta">Coleta / 揽件</option>
+          </select>
+        </div>
+        <div style="margin-bottom:14px;">
+          <div style="color:#ddd;font-size:9px;letter-spacing:1px;margin-bottom:4px;">DC/BRE | DC/基地</div>
+          <select id="f-dc" onchange="setFiltro('dc',this.value)" style="{sel_style}">{opts_dc}</select>
+        </div>
+        <div style="display:flex;gap:4px;margin-bottom:8px;">
+          <button onclick="expandirTodos(true)" style="flex:1;background:rgba(39,174,96,0.15);border:1px solid rgba(39,174,96,0.4);color:#27ae60;border-radius:4px;padding:6px 2px;font-size:9px;font-weight:700;cursor:pointer;">EXPANDIR TUDO</button>
+          <button onclick="expandirTodos(false)" style="flex:1;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);color:#ddd;border-radius:4px;padding:6px 2px;font-size:9px;font-weight:700;cursor:pointer;">RECOLHER</button>
+        </div>
+        <button onclick="resetFiltros()" style="width:100%;background:rgba(26,82,118,0.2);border:1px solid rgba(26,82,118,0.4);color:#2980b9;border-radius:4px;padding:7px;font-size:10px;font-weight:700;cursor:pointer;letter-spacing:1px;">RESET / 重置</button>
+      </div>
+    </div>"""
+
+    nav = navbar("pont_bases")
+    conteudo = """
+    <div class="page-header">
+      <div class="header-left">
+        <div class="header-icon" style="background:#1A5276;">🏢</div>
+        <div>
+          <div class="header-title">PONTUALIDADE POR BASE / DC / 按基地/DC准时率</div>
+          <div class="header-sub">SP BRE &amp; DCs · 基地与DC · <span id="periodo-txt">—</span></div>
+        </div>
+      </div>
+      <div class="header-badges">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div style="width:7px;height:7px;border-radius:50%;background:#27ae60;"></div>
+          <span style="font-size:11px;font-weight:600;color:#27ae60;">AO VIVO / 实时</span>
+        </div>
+        <div class="header-badge"><div class="hb-label">META / 目标</div><div class="hb-value" style="color:#27ae60;">≥85%</div></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <div style="flex:1;min-width:0;">
+
+        <div class="kpi-grid kpi-grid-4" style="margin-bottom:10px;">
+          <div class="kpi-card" style="border-top:3px solid #1A5276;">
+            <div class="kpi-label">TOTAL IDs / 行程总数</div>
+            <div class="kpi-value" id="kpi-total">—</div>
+            <div class="kpi-sub" id="kpi-total-sub">viagens no período</div>
+          </div>
+          <div class="kpi-card" style="border-top:3px solid #27ae60;">
+            <div class="kpi-label">NO PRAZO SAÍDA / 准时出发率</div>
+            <div class="kpi-value" id="kpi-pont-s" style="color:#27ae60;">—</div>
+            <div class="kpi-sub" id="kpi-pont-s-sub">saídas no prazo</div>
+            <div class="progress-bar" style="margin-top:6px;"><div id="kpi-bar-s" class="progress-fill" style="width:0%;"></div></div>
+          </div>
+          <div class="kpi-card" style="border-top:3px solid #27ae60;">
+            <div class="kpi-label">NO PRAZO CHEGADA / 准时到达率</div>
+            <div class="kpi-value" id="kpi-pont-c" style="color:#27ae60;">—</div>
+            <div class="kpi-sub" id="kpi-pont-c-sub">chegadas no prazo</div>
+            <div class="progress-bar" style="margin-top:6px;"><div id="kpi-bar-c" class="progress-fill" style="width:0%;"></div></div>
+          </div>
+          <div class="kpi-card" style="border-top:3px solid #e74c3c;">
+            <div class="kpi-label">PIOR DC/BASE SAÍDA / 最差DC出发</div>
+            <div class="kpi-value" id="kpi-pior" style="font-size:16px;color:#e74c3c;">—</div>
+            <div class="kpi-sub" id="kpi-pior-sub"></div>
+            <div class="progress-bar" style="margin-top:6px;"><div id="kpi-bar-pior" class="progress-fill" style="width:0%;background:#e74c3c;"></div></div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <div class="table-header" style="background:#1A5276;">
+            <span>PONTUALIDADE POR DC → BASE / 按DC→基地准时率</span>
+            <small>clique no DC para abrir as bases / 点击DC展开基地</small>
+          </div>
+          <div class="table-scroll" style="max-height:max(calc(100vh - 300px),320px);">
+            <table>
+              <thead><tr style="background:#0d2137;border-bottom:2px solid rgba(26,82,118,0.6);">
+                <th style="text-align:left;color:#5dade2;">DC / BASE</th>
+                <th style="text-align:center;color:#5dade2;">IDs</th>
+                <th style="text-align:center;color:#5dade2;">NO PRAZO SAÍDA</th>
+                <th style="text-align:center;color:#5dade2;">NO PRAZO CHEGADA</th>
+                <th style="text-align:center;color:#5dade2;">ATRASADOS</th>
+              </tr></thead>
+              <tbody id="tbody-pont"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="legend-bar">
+          <div class="legend-item"><div class="legend-dot" style="background:#27ae60;"></div>≥85% OK / 达标</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#e67e22;"></div>70–84% 注意</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#e74c3c;"></div>&lt;70% 危急</div>
+          <div class="legend-item" style="margin-left:auto;color:#ddd;">→ ida (DC→Base) &nbsp;|&nbsp; ← volta (Base→DC)</div>
+        </div>
+
+      </div>
+      FILTRO_PLACEHOLDER
+    </div>"""
+
+    conteudo = conteudo.replace("FILTRO_PLACEHOLDER", filtro_html)
+
+    js = (
+        '<script>\n'
+        'const RAW = ' + data_json + ';\n'
+        'const _DM="' + date_max + '",_DMi="' + date_min + '";\n'
+        'const _lsM=localStorage.getItem("brdrive_bases_max"),_lsF2=localStorage.getItem("brdrive_bases_from"),_lsT2=localStorage.getItem("brdrive_bases_to");\n'
+        'if(_lsM!==_DM||(_lsF2&&_lsF2>_DM)||(_lsT2&&_lsT2<_DMi)){localStorage.removeItem("brdrive_bases_from");localStorage.removeItem("brdrive_bases_to");localStorage.setItem("brdrive_bases_max",_DM);}\n'
+        'const _lsF=localStorage.getItem("brdrive_bases_from"),_lsT=localStorage.getItem("brdrive_bases_to");\n'
+        'let fDateFrom=_lsF||"' + date_min + '";\n'
+        'let fDateTo=_lsT||"' + date_max + '";\n'
+        'let fGrp="Todos", fDC="Todos";\n'
+        'let expanded=new Set();\n'
+        '\n'
+        'function cor(v){if(v>=85)return"#27ae60";if(v>=70)return"#e67e22";return"#e74c3c";}\n'
+        'function bgCor(v){if(v>=85)return"rgba(39,174,96,0.15)";if(v>=70)return"rgba(230,126,34,0.15)";return"rgba(231,76,60,0.15)";}\n'
+        'function pct(a,b){return b>0?(a/b*100):0;}\n'
+        'function esc(s){return String(s).replace(/\\\\/g,"\\\\\\\\").replace(/\'/g,"\\\\\'");}\n'
+        '\n'
+        'function getFiltrado(){\n'
+        '  return RAW.filter(r=>{\n'
+        '    if(fDateFrom && r.d < fDateFrom) return false;\n'
+        '    if(fDateTo && r.d > fDateTo) return false;\n'
+        '    if(fGrp!=="Todos" && r.grp!==fGrp) return false;\n'
+        '    if(fDC!=="Todos" && r.dc!==fDC) return false;\n'
+        '    return true;\n'
+        '  });\n'
+        '}\n'
+        '\n'
+        'function agrega(data){\n'
+        '  const byDC={};\n'
+        '  data.forEach(r=>{\n'
+        '    if(!byDC[r.dc]) byDC[r.dc]={ids:0,okS:0,comS:0,okC:0,comC:0,atr:0,bases:{}};\n'
+        '    const d=byDC[r.dc];\n'
+        '    d.ids++;\n'
+        '    if(r.ps!==""){d.comS++;if(r.ps==="No prazo"||r.ps==="No Prazo")d.okS++;}\n'
+        '    if(r.pc!==""){d.comC++;if(r.pc==="No prazo"||r.pc==="No Prazo")d.okC++;}\n'
+        '    if(r.ps==="Atrasado"||r.pc==="Atrasado")d.atr++;\n'
+        '    if(!d.bases[r.base]) d.bases[r.base]={ids:0,okS:0,comS:0,okC:0,comC:0,atr:0,st:r.st};\n'
+        '    const b=d.bases[r.base];\n'
+        '    b.ids++;\n'
+        '    if(r.ps!==""){b.comS++;if(r.ps==="No prazo"||r.ps==="No Prazo")b.okS++;}\n'
+        '    if(r.pc!==""){b.comC++;if(r.pc==="No prazo"||r.pc==="No Prazo")b.okC++;}\n'
+        '    if(r.ps==="Atrasado"||r.pc==="Atrasado")b.atr++;\n'
+        '  });\n'
+        '  return byDC;\n'
+        '}\n'
+        '\n'
+        'function linhaMetrica(ps,pc,comS,comC,ids,atr){\n'
+        '  return `<td style="text-align:center;color:#f1c40f;font-weight:700;">${ids}</td>'
+        '<td><span style="background:${bgCor(ps)};color:${cor(ps)};padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;">${comS>0?ps.toFixed(1)+"%":"—"}</span></td>'
+        '<td><span style="background:${bgCor(pc)};color:${cor(pc)};padding:2px 10px;border-radius:20px;font-size:11px;font-weight:700;">${comC>0?pc.toFixed(1)+"%":"—"}</span></td>'
+        '<td style="text-align:center;color:#e74c3c;font-weight:700;">${atr}</td>`;\n'
+        '}\n'
+        '\n'
+        'function render(){\n'
+        '  const data=getFiltrado();\n'
+        '  const comS=data.filter(r=>r.ps!=="");\n'
+        '  const comC=data.filter(r=>r.pc!=="");\n'
+        '  const okS=comS.filter(r=>r.ps==="No prazo"||r.ps==="No Prazo").length;\n'
+        '  const okC=comC.filter(r=>r.pc==="No prazo"||r.pc==="No Prazo").length;\n'
+        '  const pontS=pct(okS,comS.length), pontC=pct(okC,comC.length);\n'
+        '\n'
+        '  document.getElementById("kpi-total").textContent=data.length;\n'
+        '  const elS=document.getElementById("kpi-pont-s");\n'
+        '  elS.textContent=pontS.toFixed(1)+"%"; elS.style.color=cor(pontS);\n'
+        '  document.getElementById("kpi-pont-s-sub").textContent=okS+" de "+comS.length+" saídas no prazo";\n'
+        '  const bS=document.getElementById("kpi-bar-s");\n'
+        '  bS.style.width=Math.min(pontS,100).toFixed(0)+"%"; bS.style.background=cor(pontS);\n'
+        '  const elC=document.getElementById("kpi-pont-c");\n'
+        '  elC.textContent=pontC.toFixed(1)+"%"; elC.style.color=cor(pontC);\n'
+        '  document.getElementById("kpi-pont-c-sub").textContent=okC+" de "+comC.length+" chegadas no prazo";\n'
+        '  const bC=document.getElementById("kpi-bar-c");\n'
+        '  bC.style.width=Math.min(pontC,100).toFixed(0)+"%"; bC.style.background=cor(pontC);\n'
+        '\n'
+        '  const byDC=agrega(data);\n'
+        '  const sorted=Object.entries(byDC).sort((a,b)=>b[1].ids-a[1].ids);\n'
+        '\n'
+        '  let pior=null,pPior=999;\n'
+        '  sorted.forEach(([k,v])=>{const p=pct(v.okS,v.comS);if(v.comS>0&&p<pPior){pPior=p;pior=[k,v];}});\n'
+        '  if(pior){\n'
+        '    const p=pct(pior[1].okS,pior[1].comS);\n'
+        '    const el=document.getElementById("kpi-pior"); el.textContent=pior[0]; el.style.color=cor(p);\n'
+        '    document.getElementById("kpi-pior-sub").textContent="Saída: "+p.toFixed(1)+"%";\n'
+        '    const bp=document.getElementById("kpi-bar-pior"); bp.style.width=Math.min(p,100).toFixed(0)+"%"; bp.style.background=cor(p);\n'
+        '  } else {\n'
+        '    document.getElementById("kpi-pior").textContent="—";\n'
+        '    document.getElementById("kpi-pior-sub").textContent="";\n'
+        '    document.getElementById("kpi-bar-pior").style.width="0%";\n'
+        '  }\n'
+        '\n'
+        '  let rows="";\n'
+        '  sorted.forEach(([dcName,v])=>{\n'
+        '    const ps=pct(v.okS,v.comS), pc=pct(v.okC,v.comC);\n'
+        '    const isOpen=expanded.has(dcName);\n'
+        '    const chev=isOpen?"▼":"▶";\n'
+        '    rows+=`<tr style="background:#1f3a52;cursor:pointer;" onclick="toggleDC(\'${esc(dcName)}\')">'
+        '<td style="color:#fff;font-weight:700;"><span style="display:inline-block;width:14px;color:#5dade2;">${chev}</span>${dcName}</td>'
+        '${linhaMetrica(ps,pc,v.comS,v.comC,v.ids,v.atr)}'
+        '</tr>`;\n'
+        '    if(isOpen){\n'
+        '      const basesSorted=Object.entries(v.bases).sort((a,b)=>b[1].ids-a[1].ids);\n'
+        '      basesSorted.forEach(([baseName,b],i)=>{\n'
+        '        const bps=pct(b.okS,b.comS), bpc=pct(b.okC,b.comC);\n'
+        '        const bgr=i%2===0?"#1f0e0e":"#1a1010";\n'
+        '        const seta=b.st==="ida"?"→":b.st==="volta"?"←":"↔";\n'
+        '        rows+=`<tr style="background:${bgr};">'
+        '<td style="padding-left:34px;color:#5dade2;font-weight:600;font-size:11px;">${seta} ${baseName}</td>'
+        '${linhaMetrica(bps,bpc,b.comS,b.comC,b.ids,b.atr)}'
+        '</tr>`;\n'
+        '      });\n'
+        '    }\n'
+        '  });\n'
+        '  document.getElementById("tbody-pont").innerHTML=rows||'
+        '"<tr><td colspan=\'5\' style=\'text-align:center;color:#ddd;padding:20px;\'>Nenhum dado para os filtros selecionados</td></tr>";\n'
+        '\n'
+        '  const dates=data.map(r=>r.d).filter(Boolean).sort();\n'
+        '  document.getElementById("periodo-txt").textContent=dates.length>0?dates[0]+" → "+dates[dates.length-1]:"—";\n'
+        '}\n'
+        '\n'
+        'function toggleDC(dcName){\n'
+        '  if(expanded.has(dcName)) expanded.delete(dcName); else expanded.add(dcName);\n'
+        '  render();\n'
+        '}\n'
+        'function expandirTodos(abrir){\n'
+        '  if(abrir){ Object.keys(agrega(getFiltrado())).forEach(k=>expanded.add(k)); }\n'
+        '  else { expanded.clear(); }\n'
+        '  render();\n'
+        '}\n'
+        '\n'
+        'function setPeriodo(tipo){\n'
+        '  const max=new Date(_DM+"T00:00:00");\n'
+        '  let from=new Date(max);\n'
+        '  if(tipo==="dia"){ from=new Date(max); }\n'
+        '  else if(tipo==="semana"){ from.setDate(max.getDate()-6); }\n'
+        '  else if(tipo==="mes"){ from.setDate(max.getDate()-29); }\n'
+        '  const toISO=d=>d.toISOString().slice(0,10);\n'
+        '  fDateFrom = toISO(from) < _DMi ? _DMi : toISO(from);\n'
+        '  fDateTo = _DM;\n'
+        '  localStorage.setItem("brdrive_bases_from",fDateFrom);\n'
+        '  localStorage.setItem("brdrive_bases_to",fDateTo);\n'
+        '  document.getElementById("f-date-from").value=fDateFrom;\n'
+        '  document.getElementById("f-date-to").value=fDateTo;\n'
+        '  document.querySelectorAll(".btn-periodo").forEach(b=>{b.style.background="rgba(26,82,118,0.2)";b.style.color="#5dade2";});\n'
+        '  document.getElementById("bp-"+tipo).style.background="#1A5276"; document.getElementById("bp-"+tipo).style.color="#fff";\n'
+        '  render();\n'
+        '}\n'
+        '\n'
+        'function setFiltro(key,val){\n'
+        '  if(key==="dateFrom"){fDateFrom=val;localStorage.setItem("brdrive_bases_from",val);}\n'
+        '  else if(key==="dateTo"){fDateTo=val;localStorage.setItem("brdrive_bases_to",val);}\n'
+        '  else if(key==="grp") fGrp=val;\n'
+        '  else if(key==="dc") fDC=val;\n'
+        '  render();\n'
+        '}\n'
+        'function resetFiltros(){\n'
+        '  fDateFrom="' + date_min + '"; fDateTo="' + date_max + '";\n'
+        '  fGrp="Todos"; fDC="Todos"; expanded.clear();\n'
+        '  document.getElementById("f-date-from").value=fDateFrom;\n'
+        '  document.getElementById("f-date-to").value=fDateTo;\n'
+        '  document.getElementById("f-grp").value="Todos";\n'
+        '  document.getElementById("f-dc").value="Todos";\n'
+        '  document.querySelectorAll(".btn-periodo").forEach(b=>{b.style.background="rgba(26,82,118,0.2)";b.style.color="#5dade2";});\n'
+        '  render();\n'
+        '}\n'
+        'document.addEventListener("DOMContentLoaded",function(){\n'
+        '  var fi=document.getElementById("f-date-from"),ti=document.getElementById("f-date-to");\n'
+        '  if(fi)fi.value=fDateFrom;\n'
+        '  if(ti)ti.value=fDateTo;\n'
+        '  render();\n'
+        '});\n'
+        '</script>'
+    )
+
+    return pagina_html(nav, conteudo + js, "Pontualidade por Base/DC")
+
+
 def pg_motoristas(df):
     base_cols = ['DATA', 'MÊS', 'Transportador', 'CONDUTOR', 'Tempo Saida OFF', 'Tempo chegada OFF']
     opt_cols = ['Semana Nome Nova']
@@ -3647,6 +3994,7 @@ def gerar_dashboard(pasta="brdrive_output", dados=None):
         "mural": (pg_mural, None),
         "dashboard": (pg_utilizacao_app, df),
         "pont_op": (pg_pontualidade_op, df),
+        "pont_bases": (pg_pont_bases, df),
         "evol_semanal": (pg_evol_semanal, df),
         "infracoes": (pg_infracoes, df),
         "app_mensal": (pg_app_mensal, df),
