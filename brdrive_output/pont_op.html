@@ -192,7 +192,8 @@ const RAW = [{"d":"2026-04-13","t":"JET SP","op":"Coleta Base","ps":"No prazo","
 const _DM="2026-11-16",_DMi="2026-01-02";
 const _lsM=localStorage.getItem("brdrive_data_max"),_lsF2=localStorage.getItem("brdrive_from"),_lsT2=localStorage.getItem("brdrive_to");
 if(_lsM!==_DM||(_lsF2&&_lsF2>_DM)||(_lsT2&&_lsT2<_DMi)){localStorage.removeItem("brdrive_from");localStorage.removeItem("brdrive_to");localStorage.setItem("brdrive_data_max",_DM);}
-const _lsF=localStorage.getItem("brdrive_from"),_lsT=localStorage.getItem("brdrive_to");
+const _ont=(function(){const d=new Date();d.setDate(d.getDate()-1);let s=d.toLocaleDateString("sv-SE");if(s>_DM)s=_DM;if(s<_DMi)s=_DMi;return s;})();
+const _lsF=_ont,_lsT=_ont;
 let fDateFrom=_lsF||"2026-01-02";
 let fDateTo=_lsT||"2026-11-16";
 let fTrans = "Todos"; let fTipo = "Todos";
